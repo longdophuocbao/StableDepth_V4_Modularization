@@ -191,7 +191,15 @@ void runController()
     u_sw = constrain(u_sw, -PWM_MAX_ABS, PWM_MAX_ABS);
 
     const float PWM_DEADBAND = 0.1f;
-    float u_out = constrain(u_eq + u_sw, -PWM_MAX_ABS, PWM_MAX_ABS);
+    float u_out = 0.0f;
+    if (mode == 4)
+    {
+        u_out = constrain(u_direct, -PWM_MAX_ABS, PWM_MAX_ABS);
+    }
+    else
+    {
+        u_out = constrain(u_eq + u_sw, -PWM_MAX_ABS, PWM_MAX_ABS);
+    }
 
     float u_out_hardware = 0.0f;
     if (fabsf(u_out) > 0.05f)
