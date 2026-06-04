@@ -369,6 +369,12 @@
                     </div>
                 </div>
 
+                <div class="flex items-center gap-2 px-1">
+                    <input type="checkbox" id="chkAutoSync"
+                        class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 dark:bg-slate-700 dark:border-slate-600">
+                    <label for="chkAutoSync" class="text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer select-none">Tự động cập nhật (Auto-Sync)</label>
+                </div>
+
                 <div class="flex gap-2">
                     <button id="btnToggleStart"
                         class="flex-1 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white py-2 rounded-md transition font-medium text-sm flex justify-center items-center gap-1 shadow-sm">
@@ -1436,12 +1442,16 @@
 
         // === LOGIC GỬI THAM SỐ XUỐNG BOARD BẰNG PROTOCOL NHỊ PHÂN ===
         let isSystemRunning = false;
+        let isSending = false;
 
-        async function sendParamsToBoard() {
+        async function sendParamsToBoard(silent = false) {
+            if (isSending) return false;
             if (!port || !port.writable) {
-                alert("Vui lòng kết nối cổng COM trước khi gửi lệnh/tham số!");
+                if (!silent) alert("Vui lòng kết nối cổng COM trước khi gửi lệnh/tham số!");
                 return false;
             }
+
+            isSending = true;
 
             // Gói tin TX cấu trúc: 19 floats = 76 bytes payload
             const txParams = [
@@ -1497,11 +1507,37 @@
                 return true;
             } catch (err) {
                 console.error("Lỗi khi gửi:", err);
-                alert("Có lỗi khi gửi dữ liệu xuống Board!");
-                if (writer) writer.releaseLock();
+                if (!silent) alert("Có lỗi khi gửi dữ liệu xuống Board!");
+                if (writer) {
+                    try { writer.releaseLock(); } catch(e) {}
+                }
                 return false;
+            } finally {
+                isSending = false;
             }
         }
+
+        // --- Logic Auto-Sync ---
+        const autoSyncInputs = [
+            'p_mode', 'p_depth_target', 'p_sp_ref', 'p_sp_amp', 'p_sp_freq',
+            'p_kp', 'p_ki', 'p_kd', 'p_k1', 'p_k2',
+            'p_mk', 'p_mt', 'p_ml', 'p_fc_lift', 'p_fc_tail', 'p_fc_de', 'p_fc_ref', 'p_u_direct'
+        ];
+        const chkAutoSync = document.getElementById('chkAutoSync');
+
+        autoSyncInputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                // Sử dụng sự kiện 'change' cho sliders để tránh spam serial khi đang kéo
+                // Sử dụng sự kiện 'input' cho number inputs hoặc khi muốn phản hồi tức thì
+                const eventType = el.type === 'range' ? 'change' : 'input';
+                el.addEventListener(eventType, () => {
+                    if (chkAutoSync.checked && isConnected) {
+                        sendParamsToBoard(true); // Gửi ở chế độ im lặng
+                    }
+                });
+            }
+        });
 
         // Sự kiện cho nút Bắt đầu (Start) / Dừng (Stop)
         document.getElementById('btnToggleStart').addEventListener('click', async () => {
