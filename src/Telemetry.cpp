@@ -115,6 +115,82 @@ void serialTuningTask(void *param)
             else
                 Serial.read();
         }
+        #ifdef DEBUG_SERIAL_2ESP
+        // SỬA Ở ĐÂY: Gửi data sang ESP32 thứ hai qua Serial2
+        Serial2.write((uint8_t *)&msg, sizeof(msg));
+
+        // SỬA Ở ĐÂY: Lắng nghe lệnh điều khiển từ ESP32 thứ hai qua Serial2
+        if (Serial2.available() >= sizeof(SerialCommand))
+        {
+            uint8_t buf[sizeof(SerialCommand)];
+            if (Serial2.peek() == 0xAA)
+            {
+                Serial2.readBytes(buf, sizeof(SerialCommand));
+                SerialCommand *cmd = (SerialCommand *)buf;
+                if (cmd->head1 == 0xAA && cmd->head2 == 0x55 && calculateChecksum((uint8_t *)&cmd->values, sizeof(cmd->values)) == cmd->checksum)
+                {
+                    if (xSemaphoreTake(g_mutex, pdMS_TO_TICKS(10)) == pdTRUE)
+                    {
+                        float *cv = cmd->values;
+                        g_run_state = (cv[0] > 0.5f);
+                        g_mode = (int)cv[1];
+                        g_depth_target = cv[2];
+                        g_alpha_manual = cv[3];
+                        g_sp_amp = cv[4];
+                        g_sp_freq = cv[5];
+
+                        g_Kp = cv[6];
+                        g_Ki = cv[7];
+                        g_Kd = cv[8];
+                        g_K1 = cv[9];
+                        g_K2 = cv[10];
+
+                        g_K = cv[11];
+                        g_tau1 = cv[12];
+                        g_L = cv[13] / 1000.0f; // HTML sends L in ms
+
+                        g_Kp = 1.9f;
+                        g_Ki = 1.5f;
+                        g_Kd = 1.33f;
+                        g_K1 = 3.7f;
+                        g_K2 = 0.5f;
+
+                        g_K = 35;
+                        g_tau1 = 1.224;
+                        g_L = 33.0f / 1000.0f; // HTML sends L in ms
+
+                        if (g_fc_lifting != cv[14] || g_fc_tailboard != cv[15] || g_fc_de != cv[16] || g_omega_ref != cv[17])
+                        {
+                            g_fc_lifting = cv[14];
+                            g_fc_tailboard = cv[15];
+                            g_fc_de = cv[16];
+                            g_omega_ref = cv[17];
+
+                            g_fc_lifting = 10.0f;
+                            g_fc_tailboard =  10.0f;
+                            g_fc_de = 5.0f;
+                            g_omega_ref = 10.0f;
+
+                            filterLifting.reinit(g_fc_lifting, 500.0f);
+                            filterTailboard.reinit(g_fc_tailboard, 500.0f);
+                            filterAlpha_actual_dot.reinit(g_fc_de, 500.0f);
+                            refFilter.reinit(g_omega_ref, 1.0f);
+                        }
+
+                        g_u_direct = cv[18];
+
+                        g_model_dirty = true;
+                        xSemaphoreGive(g_mutex);
+                    }
+                }
+            }
+            else
+            {
+                Serial2.read(); // Xóa byte rác
+            }
+        }   
+        #endif
+
         vTaskDelayUntil(&xLastWake, SERIALDEBUG_DT_TICKS);
     }
 }

@@ -11,12 +11,15 @@ void setup()
     delay(500);
     Serial.begin(250000);
     delay(500);
-    
+#ifdef DEBUG_SERIAL_2ESP
+    Serial2.begin(250000, SERIAL_8N1, 16, 17);
+    delay(500);
+#endif
     Serial.println("\n=== Tractor SOIPDT + Super-Twisting SMC (Modular) ===");
-    
+
     initHardware();
     Serial.println("Khởi tạo phần cứng thành công!");
-    
+
     // Đợi một chút để ADS1115 hoàn thành lượt chuyển đổi đầu tiên
     delay(100);
     float init_lifting = 266.6f - readLiftingSensorRaw();
@@ -25,7 +28,7 @@ void setup()
     init_tail = constrain(init_tail, 0.0f, 80.0f);
 
     g_mutex = xSemaphoreCreateMutex();
-    
+
     filterLifting.init(g_fc_lifting, 500.0f);
     filterTailboard.init(g_fc_tailboard, 500.0f);
     medianLifting.init(init_lifting, 1.0f);
@@ -37,12 +40,12 @@ void setup()
     g_model_wd.tau1 = g_tau1;
     g_model_wd.L = g_L;
     g_model_wd.init(DT);
-    
+
     g_model_nd.K = g_K;
     g_model_nd.tau1 = g_tau1;
     g_model_nd.L = 0.0f;
     g_model_nd.init(DT);
-    
+
     g_model_dirty = false;
 
     xTaskCreatePinnedToCore(sensorReadTask, "SensRead", 4096, nullptr, 3, nullptr, 1);

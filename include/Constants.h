@@ -25,6 +25,9 @@ static const TickType_t SENSOR_DT_TICKS = pdMS_TO_TICKS(2);
 static const TickType_t SERIALDEBUG_DT_TICKS = pdMS_TO_TICKS(20); // 20ms = 50hz
 #endif
 
+#define DEBUG_SERIAL_2ESP
+
+
 static const int MAX_DELAY_SAMPLES = 2000;
 
 #endif // CONSTANTS_H
